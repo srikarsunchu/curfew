@@ -53,6 +53,11 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/simulate' && config.dryRun) {
       const { kind } = JSON.parse((await readBody(req)) || '{}');
+      if (kind === 'reset') { // drop the last hour so scenarios don't stack
+        store.db.prepare('delete from payments where created_at >= ?').run(new Date(Date.now() - 3_600_000).toISOString());
+        store.setKV('snooze_until', null); store.setKV('last_verdict', null);
+        return json(res, 200, { ok: true });
+      }
       const v = await burst(store, kind === 'launch' ? 'launch' : 'attack');
       return json(res, 200, v);
     }

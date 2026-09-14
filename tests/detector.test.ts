@@ -58,6 +58,9 @@ test('responder holds, then acts on tick; undo prevents action', async () => {
   await tick(s);
   assert.equal(s.incident(inc.id)!.status, 'undone');
   assert.equal(s.incident(inc.id)!.acted, null);
+  // the next payment in the same window must not reopen a hold
+  await ingest(s, { ...attackBurst()[0]!, id: 'pay_after_undo', user_id: 'user_bot_99' });
+  assert.equal(s.openIncidents().length, 0, 'undo snoozes the window');
 
   const s2 = fresh();
   for (const p of attackBurst(Date.now(), 8)) await ingest(s2, p);

@@ -33,7 +33,7 @@ button:hover{border-color:var(--fg)}button.primary{background:var(--fg);color:va
 <div class="grid">
 <section><h2>Signals · last <span id="win"></span> min</h2><div id="signals"></div></section>
 <section><h2>Last 60 min · paid per minute</h2><div class="bars" id="bars"></div><div class="mut" id="barsub" style="margin-top:8px"></div>
-<div id="demo" class="row" style="margin-top:14px" hidden><span class="mut">demo:</span><button id="atk" class="danger">simulate card-testing attack</button><button id="lch">simulate real launch</button></div></section>
+<div id="demo" class="row" style="margin-top:14px" hidden><span class="mut">demo:</span><button id="atk" class="danger">simulate card-testing attack</button><button id="lch">simulate real launch</button><button id="rst">reset</button></div></section>
 </div>
 <section style="margin-top:16px"><h2>Incidents</h2><div id="incidents"></div></section>
 <section style="margin-top:16px"><h2>What normal looks like</h2><div id="baseline" class="mut"></div></section>
@@ -52,7 +52,7 @@ async function load(){const s=await fetch('/api/state').then(r=>r.json());
  for(const p of s.recent){const i=59-Math.floor((now-new Date(p.created_at))/60000);if(i<0||i>59)continue;p.status==='paid'?mins[i].n++:mins[i].f++;}
  const mx=Math.max(1,...mins.map(m=>m.n+m.f));$('#bars').innerHTML=mins.map(m=>`<div class="${m.f>m.n?'bad':''}" style="height:${(m.n+m.f)/mx*100}%" title="${m.n} paid ${m.f} failed"></div>`).join('');
  const tot=s.recent.filter(p=>p.status==='paid');$('#barsub').textContent=`${tot.length} paid, ${s.recent.length-tot.length} declined, $${tot.reduce((a,p)=>a+p.usd_total,0).toFixed(0)}`;
- $('#demo').hidden=!s.config.dryRun;$('#atk').onclick=()=>post('/api/simulate',{kind:'attack'}).then(load);$('#lch').onclick=()=>post('/api/simulate',{kind:'launch'}).then(load);
+ $('#demo').hidden=!s.config.dryRun;$('#atk').onclick=()=>post('/api/simulate',{kind:'attack'}).then(load);$('#rst').onclick=()=>post('/api/simulate',{kind:'reset'}).then(load);$('#lch').onclick=()=>post('/api/simulate',{kind:'launch'}).then(load);
  $('#incidents').innerHTML=s.incidents.map(i=>`<div class="inc"><span class="tag ${i.status}">${i.status}</span><b>#${i.id} ${i.level}</b><span class="mut">${fmt(i.opened_at)} · ${i.signals.filter(x=>x.fired).map(x=>x.name).join(', ')} · ${i.suspect_ids.length} suspects</span>
    ${i.status==='holding'?`<span class="mut">acts ${fmt(i.act_at)}</span><button class="primary" onclick="post('/api/undo/${i.id}').then(load)">undo, this is legit</button>`:''}
    ${i.acted?`<span class="mut">${i.acted.refunded.length} refunded · ${i.acted.revoked.length} revoked${i.acted.errors.length?` · ${i.acted.errors.length} errors`:''}</span>`:''}</div>`).join('')||'<span class="mut">none</span>';

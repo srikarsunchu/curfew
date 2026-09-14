@@ -12,6 +12,7 @@ import { sendAlert } from './alert.ts';
  */
 export async function respond(store: Store, verdict: Verdict): Promise<Incident | null> {
   if (verdict.level === 'normal') return null;
+  if (snoozed(store)) return null; // just undone: the same window would re-trip on the next payment
   if (launchModeActive(store)) {
     // Still record it, still alert, never act.
     const inc = store.openIncident(base(verdict, 'alerted'));
@@ -84,7 +85,13 @@ async function revokeAll(store: Store, inc: Incident) {
 export function undo(store: Store, id: number): Incident | null {
   const inc = store.incident(id); if (!inc || inc.status !== 'holding') return inc;
   store.updateIncident(id, { status: 'undone' });
+  // Trust the current window: don't reopen on it. Fresh signals after the window rolls still fire.
+  store.setKV('snooze_until', new Date(Date.now() + config.windowMin * 60_000).toISOString());
   return store.incident(id);
+}
+function snoozed(store: Store): boolean {
+  const until = store.getKV<string | null>('snooze_until');
+  return !!until && new Date(until) > new Date();
 }
 
 /** "I'm launching": suppress action for N hours. Alerts still fire so you can watch. */
