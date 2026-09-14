@@ -1,0 +1,62 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>tripwire</title>
+<style>
+:root{--bg:#0b0c0e;--fg:#e8e6e1;--mut:#8a8f98;--line:#1f2226;--ok:#3ddc84;--warn:#f5b74a;--bad:#ff4d4f;--card:#111316}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+main{max-width:920px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0 0 20px;display:flex;justify-content:space-between;align-items:center}
+h1 span{font-weight:400;text-transform:none;letter-spacing:0}
+.status{border:1px solid var(--line);border-radius:10px;padding:22px 24px;background:var(--card);display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;margin-bottom:16px}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 6px color-mix(in srgb,var(--ok) 20%,transparent)}
+.attack .dot{background:var(--bad);box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 25%,transparent);animation:p 1s infinite alternate}
+.elevated .dot{background:var(--warn);box-shadow:0 0 0 6px color-mix(in srgb,var(--warn) 25%,transparent)}
+@keyframes p{to{box-shadow:0 0 0 12px transparent}}
+.level{font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1}.sub{color:var(--mut);margin-top:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+section{border:1px solid var(--line);border-radius:10px;padding:18px 20px;background:var(--card)}
+h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0 0 12px}
+.sig{display:grid;grid-template-columns:10px 110px 1fr;gap:10px;padding:6px 0;border-top:1px solid var(--line);align-items:baseline}
+.sig:first-of-type{border-top:0}.sig i{width:8px;height:8px;border-radius:50%;background:#2a2e34;display:inline-block;margin-top:5px}
+.sig.on i{background:var(--bad)}.sig b{font-weight:600}.sig small{color:var(--mut)}
+.inc{border-top:1px solid var(--line);padding:10px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.inc:first-of-type{border-top:0}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut)}
+.tag.holding{color:var(--warn);border-color:var(--warn)}.tag.acted{color:var(--bad);border-color:var(--bad)}.tag.undone{color:var(--ok);border-color:var(--ok)}
+button{background:transparent;color:var(--fg);border:1px solid #33373d;border-radius:7px;padding:6px 12px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--fg)}button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}button.danger{color:var(--bad);border-color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.mut{color:var(--mut)}
+.bars{display:flex;gap:2px;height:48px;align-items:flex-end;margin-top:8px}.bars div{flex:1;background:#2a2e34;min-height:2px;border-radius:2px 2px 0 0}.bars div.new{background:var(--warn)}.bars div.bad{background:var(--bad)}
+#launch{margin-left:auto}
+</style></head><body><main>
+<h1>tripwire <span id="meta" class="mut"></span></h1>
+<div class="status" id="status"><div class="dot"></div><div><div class="level" id="level">…</div><div class="sub" id="sub"></div></div>
+<div class="row"><button id="launch">I'm launching (2h)</button></div></div>
+<div class="grid">
+<section><h2>Signals · last <span id="win"></span> min</h2><div id="signals"></div></section>
+<section><h2>Last 60 min · paid per minute</h2><div class="bars" id="bars"></div><div class="mut" id="barsub" style="margin-top:8px"></div>
+<div id="demo" class="row" style="margin-top:14px" hidden><span class="mut">demo:</span><button id="atk" class="danger">simulate card-testing attack</button><button id="lch">simulate real launch</button></div></section>
+</div>
+<section style="margin-top:16px"><h2>Incidents</h2><div id="incidents"></div></section>
+<section style="margin-top:16px"><h2>What normal looks like</h2><div id="baseline" class="mut"></div></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);const post=(u,b)=>fetch(u,{method:'POST',body:JSON.stringify(b||{})}).then(r=>r.json());
+const fmt=d=>new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+async function load(){const s=await fetch('/api/state').then(r=>r.json());
+ const lv=s.last?.level||'normal';$('#status').className='status '+lv;$('#level').textContent=lv.toUpperCase();
+ $('#sub').textContent=s.last?`${s.last.paid} paid in window · ${s.last.score}/6 signals · checked ${fmt(s.last.at)}`:'no events yet';
+ if(s.launch_until){$('#sub').textContent+=` · launch mode until ${fmt(s.launch_until)}`;$('#launch').textContent='end launch mode';}else $('#launch').textContent="I'm launching (2h)";
+ $('#launch').onclick=()=>post('/api/launch',{hours:s.launch_until?0:2}).then(load);
+ $('#win').textContent=s.config.windowMin;$('#meta').textContent=(s.config.dryRun?'dry run · ':'')+`refund delay ${s.config.refundDelayMin}m`;
+ $('#signals').innerHTML=(s.last?.signals||[]).map(x=>`<div class="sig ${x.fired?'on':''}"><i></i><b>${x.name}</b><span>${x.note}<br><small>value ${x.value} · trips above ${x.threshold}</small></span></div>`).join('')||'<span class="mut">waiting for first payment</span>';
+ const now=Date.now(),mins=Array.from({length:60},()=>({n:0,f:0}));
+ for(const p of s.recent){const i=59-Math.floor((now-new Date(p.created_at))/60000);if(i<0||i>59)continue;p.status==='paid'?mins[i].n++:mins[i].f++;}
+ const mx=Math.max(1,...mins.map(m=>m.n+m.f));$('#bars').innerHTML=mins.map(m=>`<div class="${m.f>m.n?'bad':''}" style="height:${(m.n+m.f)/mx*100}%" title="${m.n} paid ${m.f} failed"></div>`).join('');
+ const tot=s.recent.filter(p=>p.status==='paid');$('#barsub').textContent=`${tot.length} paid, ${s.recent.length-tot.length} declined, $${tot.reduce((a,p)=>a+p.usd_total,0).toFixed(0)}`;
+ $('#demo').hidden=!s.config.dryRun;$('#atk').onclick=()=>post('/api/simulate',{kind:'attack'}).then(load);$('#lch').onclick=()=>post('/api/simulate',{kind:'launch'}).then(load);
+ $('#incidents').innerHTML=s.incidents.map(i=>`<div class="inc"><span class="tag ${i.status}">${i.status}</span><b>#${i.id} ${i.level}</b><span class="mut">${fmt(i.opened_at)} · ${i.signals.filter(x=>x.fired).map(x=>x.name).join(', ')} · ${i.suspect_ids.length} suspects</span>
+   ${i.status==='holding'?`<span class="mut">acts ${fmt(i.act_at)}</span><button class="primary" onclick="post('/api/undo/${i.id}').then(load)">undo, this is legit</button>`:''}
+   ${i.acted?`<span class="mut">${i.acted.refunded.length} refunded · ${i.acted.revoked.length} revoked${i.acted.errors.length?` · ${i.acted.errors.length} errors`:''}</span>`:''}</div>`).join('')||'<span class="mut">none</span>';
+ const b=s.baseline;$('#baseline').textContent=b?`learned ${new Date(b.learned_at).toLocaleDateString()} from ${b.total_paid} paid over ${b.days}d · ${(b.overall_rate*s.config.windowMin/ s.config.windowMin*(1440/s.config.windowMin)).toFixed(0)}/day · $${b.avg_usd.toFixed(0)} avg · ${Math.round(b.new_buyer_share*100)}% first-time buyers · ${Math.round(b.decline_share*100)}% declines · sells to ${Object.entries(b.country_share).sort((a,z)=>z[1]-a[1]).slice(0,5).map(([c,v])=>`${c} ${Math.round(v*100)}%`).join(', ')}`:'not learned yet, run: npm run learn';
+}
+load();setInterval(load,5000);
+</script></body></html>
