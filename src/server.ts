@@ -79,7 +79,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse) {
       return (await session(req)) ? redirect(res, '/app') : html(res, pages.landing);
     }
     if (p === '/connect' && req.method === 'GET') return html(res, pages.connect.replace('__PERMISSIONS__', JSON.stringify(REQUIRED_PERMISSIONS)));
-    if (p === '/health') return json(res, 200, { ok: true, tenants: (await store.tenantIds()).length, db: config.databaseUrl ? 'postgres' : 'sqlite' });
+    if (p === '/health') return json(res, 200, { ok: true, tenants: (await store.tenantIds()).length, db: config.databaseUrl ? 'postgres' : 'sqlite', encryption: !!config.encryptionKey, cron: !!config.cronSecret, publicUrl: config.publicUrl });
 
     // ---- onboarding ----
     if (p === '/api/connect' && req.method === 'POST') {
