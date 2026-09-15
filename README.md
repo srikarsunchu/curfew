@@ -17,17 +17,23 @@ Sentry for payment fraud. Zero dependencies. One process.
 
 Whop is the merchant of record. This tool cannot decline a charge, and it cannot stop Whop from suspending an account. It shrinks the damage window from "when you wake up" to ten minutes. Refunds still cost the processing fee.
 
-## Run it
+## Use it
+
+Hosted: **https://curfew-blush.vercel.app** → Connect your Whop → paste an account API key with the scopes the page lists. Curfew pulls sixty days of payments, learns your baseline, registers a webhook on your account, and starts watching. Disconnect removes the webhook and deletes everything it stored.
+
+Keys and webhook secrets are encrypted at rest (AES-256-GCM). Curfew can read your payments, refund them, and cancel memberships, so grant only the listed scopes. Read `src/` before trusting a hosted instance; it is short.
+
+## Self-host
 
 ```bash
 npm install
-cp .env.example .env   # fill WHOP_API_KEY, PUBLIC_URL, ALERT_WEBHOOK_URL
-npm run learn 60       # pull 60 days of payments, build the baseline
-npm run register       # create the Whop webhook, prints WHOP_WEBHOOK_SECRET for .env
-npm start              # http://localhost:8787
+cp .env.example .env    # PUBLIC_URL, ENCRYPTION_KEY (32 random bytes hex), CRON_SECRET
+npm start               # SQLite at ./curfew.db, http://localhost:8787
 ```
 
-Needs Node 22.18+ (type stripping and `node:sqlite`). Any host that gives you a public URL works. Point `ALERT_WEBHOOK_URL` at a Slack or Discord incoming webhook.
+On Vercel: `vercel deploy`, add a Postgres integration (Neon works), and set `ENCRYPTION_KEY`, `CRON_SECRET`, `PUBLIC_URL`. `vercel.json` routes everything to one function and runs `/api/tick` every minute so holds fire even when no webhook arrives.
+
+Needs Node 22.18+ (type stripping and `node:sqlite`).
 
 ## Demo without a Whop account
 
@@ -67,7 +73,11 @@ src/baseline.ts   learn "normal" from history
 src/detector.ts   six signals -> normal | elevated | attack, plus the suspect list
 src/responder.ts  hold, alert, act, undo, launch mode
 src/engine.ts     ingest a payment and re-evaluate the window
-src/server.ts     webhook receiver, JSON API, dashboard
+src/server.ts     request handler: webhooks per tenant, connect flow, JSON API, pages
+src/local.ts      local Node server around the handler; api/index.ts is the Vercel function
+src/tenant.ts     connect, learn, disconnect
+src/store.ts      Store interface: SQLite locally, Postgres on Vercel
+src/crypto.ts     AES-256-GCM for keys and secrets at rest
 src/simulate.ts   synthetic history and bursts, used by tests and the demo
 tests/            node:test, runs in dry run
 ```
