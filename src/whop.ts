@@ -22,6 +22,7 @@ export function toPayment(p: any): Payment {
     created_at: p.created_at ?? p.paid_at ?? new Date().toISOString(),
     usd_total: Number(p.usd_total ?? p.total ?? 0),
     user_id: p.user?.id ?? null,
+    user_name: p.user?.name ?? p.user?.email ?? p.user?.username ?? null,
     member_id: p.member?.id ?? null,
     membership_id: p.membership?.id ?? null,
     country: p.billing_address?.country ?? null,

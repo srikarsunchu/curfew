@@ -36,7 +36,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/state') {
       const b = store.baseline;
       return json(res, 200, {
-        baseline: b, last: store.getKV('last_verdict'), incidents: store.incidents(20),
+        baseline: b, last: store.getKV('last_verdict'), scored: store.getKV('scored') ?? [], incidents: store.incidents(20),
         launch_until: launchModeActive(store) ? store.getKV('launch_until') : null,
         recent: store.paymentsSince(new Date(Date.now() - 3_600_000).toISOString()).slice(-200),
         config: { refundDelayMin: config.refundDelayMin, windowMin: config.windowMin, immediateRevoke: config.immediateRevoke, dryRun: config.dryRun },
@@ -55,7 +55,8 @@ const server = createServer(async (req, res) => {
       const { kind } = JSON.parse((await readBody(req)) || '{}');
       if (kind === 'reset') { // drop the last hour so scenarios don't stack
         store.db.prepare('delete from payments where created_at >= ?').run(new Date(Date.now() - 3_600_000).toISOString());
-        store.setKV('snooze_until', null); store.setKV('last_verdict', null);
+        store.db.prepare(`update incidents set status = 'undone' where status = 'holding'`).run();
+        store.setKV('snooze_until', null); store.setKV('last_verdict', null); store.setKV('scored', []);
         return json(res, 200, { ok: true });
       }
       const v = await burst(store, kind === 'launch' ? 'launch' : 'attack');

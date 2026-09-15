@@ -10,7 +10,7 @@ export class Store {
       pragma journal_mode = wal;
       create table if not exists payments (
         id text primary key, status text, created_at text, usd_total real,
-        user_id text, member_id text, membership_id text, country text,
+        user_id text, user_name text, member_id text, membership_id text, country text,
         card_fingerprint text, card_last4 text, decline_code text, refunded_at text
       );
       create index if not exists payments_created on payments(created_at);
@@ -25,9 +25,9 @@ export class Store {
   }
 
   upsertPayment(p: Payment) {
-    this.db.prepare(`insert into payments values (?,?,?,?,?,?,?,?,?,?,?,?)
+    this.db.prepare(`insert into payments values (?,?,?,?,?,?,?,?,?,?,?,?,?)
       on conflict(id) do update set status=excluded.status, decline_code=excluded.decline_code, refunded_at=excluded.refunded_at`)
-      .run(p.id, p.status, p.created_at, p.usd_total, p.user_id, p.member_id, p.membership_id, p.country,
+      .run(p.id, p.status, p.created_at, p.usd_total, p.user_id, p.user_name, p.member_id, p.membership_id, p.country,
            p.card_fingerprint, p.card_last4, p.decline_code, p.refunded_at);
   }
 

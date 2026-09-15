@@ -26,7 +26,7 @@ export function detect({ baseline, window, firstSeen, now = new Date() }: Detect
   const sd = Math.max(hb.sd, 1);
   const z = (paid.length - hb.mean) / sd;
   signals.push({ name: 'velocity', value: round(z), threshold: 4, fired: z > 4 && paid.length >= 5,
-    note: `${paid.length} paid in window vs usual ${round(hb.mean)}±${round(hb.sd)}` });
+    note: `${paid.length} paid in window vs usual ${hb.mean < 1 ? hb.mean.toFixed(1) : round(hb.mean)}` });
 
   // 2. New buyers: share of paid payments from users with no earlier history.
   const windowStart = Math.min(...window.map((p) => +new Date(p.created_at)), +now);
@@ -92,3 +92,44 @@ export function detect({ baseline, window, firstSeen, now = new Date() }: Detect
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+
+/**
+ * Per-payment risk score, 0-99, Radar-style. Each factor is a plain sentence so the row can
+ * explain itself. Factors are additive; the window verdict supplies the context factors
+ * (velocity, decline burst) that a single payment cannot know about on its own.
+ */
+export type Scored = Payment & { risk: number; insights: string[] };
+
+export function scorePayments(window: Payment[], baseline: Baseline, firstSeen: Map<string, string>, verdict: Verdict): Scored[] {
+  const byFp = new Map<string, Set<string>>();
+  const byUser = new Map<string, Set<string>>();
+  const failsByUser = new Map<string, number>();
+  for (const p of window) {
+    if (p.card_fingerprint) { (byFp.get(p.card_fingerprint) ?? byFp.set(p.card_fingerprint, new Set()).get(p.card_fingerprint)!).add(p.user_id ?? p.id); }
+    if (p.user_id && p.card_fingerprint) { (byUser.get(p.user_id) ?? byUser.set(p.user_id, new Set()).get(p.user_id)!).add(p.card_fingerprint); }
+    if (p.user_id && (p.status === 'failed' || p.decline_code)) failsByUser.set(p.user_id, (failsByUser.get(p.user_id) ?? 0) + 1);
+  }
+  const fired = new Set(verdict.signals.filter((s) => s.fired).map((s) => s.name));
+  const windowStart = Math.min(...window.map((p) => +new Date(p.created_at)));
+  return window.map((p) => {
+    const f: [number, string][] = [];
+    const first = p.user_id ? firstSeen.get(p.user_id) : undefined;
+    if (!p.user_id || !first || +new Date(first) >= windowStart) f.push([14, 'First purchase from this account']);
+    else f.push([0, `Customer since ${first.slice(0, 10)}`]);
+    const share = p.country ? baseline.country_share[p.country] ?? 0 : 0;
+    if (p.country && share < 0.02) f.push([18, `Unusual country ${p.country}, ${(share * 100).toFixed(1)}% of your sales`]);
+    const sharers = p.card_fingerprint ? byFp.get(p.card_fingerprint)!.size : 1;
+    if (sharers >= 3) f.push([30, `Card shared by ${sharers} accounts`]);
+    const cards = p.user_id ? byUser.get(p.user_id)?.size ?? 1 : 1;
+    if (cards >= 3) f.push([22, `Account tried ${cards} different cards`]);
+    const fails = p.user_id ? failsByUser.get(p.user_id) ?? 0 : 0;
+    if (fails >= 2) f.push([12, `${fails} declined attempts from this account`]);
+    if (p.status === 'failed' || p.decline_code) f.push([6, `Declined: ${p.decline_code ?? 'unknown'}`]);
+    if (fired.has('velocity')) f.push([8, 'Arrived during a volume spike']);
+    if (fired.has('declines')) f.push([8, 'Arrived during a decline burst']);
+    f.sort((a, b) => b[0] - a[0]);
+    const risk = Math.min(99, 4 + f.reduce((a, [w]) => a + w, 0));
+    const insights = f.map(([, t]) => t);
+    return { ...p, risk: Math.min(99, risk), insights };
+  });
+}

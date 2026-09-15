@@ -1,5 +1,5 @@
 import { config } from './config.ts';
-import { detect } from './detector.ts';
+import { detect, scorePayments } from './detector.ts';
 import { respond } from './responder.ts';
 import type { Store } from './store.ts';
 import type { Payment, Verdict } from './types.ts';
@@ -16,6 +16,7 @@ export async function evaluate(store: Store, now = new Date()): Promise<Verdict 
   const since = new Date(now.getTime() - config.windowMin * 60_000).toISOString();
   const window = store.paymentsSince(since).filter((p) => p.created_at <= now.toISOString());
   const verdict = detect({ baseline, window, firstSeen: store.firstSeen(), now });
+  store.setKV('scored', scorePayments(window, baseline, store.firstSeen(), verdict).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 60));
   store.setKV('last_verdict', { at: now.toISOString(), level: verdict.level, score: verdict.score, signals: verdict.signals, paid: window.filter((p) => p.status === 'paid').length });
   await respond(store, verdict);
   return verdict;

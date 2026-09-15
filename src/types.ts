@@ -5,6 +5,7 @@ export type Payment = {
   created_at: string;        // ISO
   usd_total: number;
   user_id: string | null;
+  user_name: string | null;  // user.name or email, display only
   member_id: string | null;
   membership_id: string | null;
   country: string | null;    // billing_address.country
