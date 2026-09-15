@@ -5,6 +5,7 @@ import sys, subprocess, glob, os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 frames_dir, wallpaper, out = sys.argv[1:4]
+NO_CAPTIONS = '--no-captions' in sys.argv
 FPS = 30
 W, H = 1920, 1080
 WIN = (222, 48)            # window top-left, measured from the reference
@@ -49,7 +50,7 @@ for i, f in enumerate(files):
     win = Image.open(f).convert('RGB')
     im.paste(win, WIN, mask)
     d = ImageDraw.Draw(im)
-    for a, b, text in CAPTIONS:
+    for a, b, text in ([] if NO_CAPTIONS else CAPTIONS):
         if a <= t < b:
             # 0.25 s fade in/out
             k = min(1, (t - a) / 0.25, (b - t) / 0.25)
