@@ -5,7 +5,8 @@ import { Store } from './store.ts';
 import { ingest } from './engine.ts';
 import { toPayment, verifyWebhook } from './whop.ts';
 import { launchModeActive, setLaunchMode, tick, undo } from './responder.ts';
-import { burst } from './simulate.ts';
+import { burst, resetBurst } from './simulate.ts';
+import { act } from './responder.ts';
 
 const store = new Store();
 const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
@@ -52,14 +53,16 @@ const server = createServer(async (req, res) => {
       setLaunchMode(store, Number(hours ?? 0)); return json(res, 200, { ok: true });
     }
     if (req.method === 'POST' && url.pathname === '/api/simulate' && config.dryRun) {
-      const { kind } = JSON.parse((await readBody(req)) || '{}');
-      if (kind === 'reset') { // drop the last hour so scenarios don't stack
+      const { kind, upto } = JSON.parse((await readBody(req)) || '{}');
+      if (kind === 'act') { for (const inc of store.openIncidents()) await act(store, inc); return json(res, 200, { ok: true }); }
+      if (kind === 'reset') {
+        resetBurst(); // drop the last hour so scenarios don't stack
         store.db.prepare('delete from payments where created_at >= ?').run(new Date(Date.now() - 3_600_000).toISOString());
-        store.db.prepare(`update incidents set status = 'undone' where status = 'holding'`).run();
+        store.db.prepare('delete from incidents').run();
         store.setKV('snooze_until', null); store.setKV('last_verdict', null); store.setKV('scored', []);
         return json(res, 200, { ok: true });
       }
-      const v = await burst(store, kind === 'launch' ? 'launch' : 'attack');
+      const v = await burst(store, kind === 'launch' ? 'launch' : kind === 'normal' ? 'normal' : 'attack', typeof upto === 'number' ? upto : undefined);
       return json(res, 200, v);
     }
     if (url.pathname === '/') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(html); }

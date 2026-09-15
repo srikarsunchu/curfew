@@ -81,13 +81,32 @@ export function seed(store: Store, windowMin = 10) {
   store.baseline = learnBaseline(store.allPayments(), windowMin, 60);
 }
 
-export async function burst(store: Store, kind: 'attack' | 'launch'): Promise<Verdict | null> {
+let pending: Payment[] = [];
+let cursor = 0;
+
+/** Ingest a whole burst, or with `upto` only the first N payments of a burst prepared once (for stepped demos). */
+export async function burst(store: Store, kind: 'attack' | 'launch' | 'normal', upto?: number): Promise<Verdict | null> {
   if (!store.baseline) seed(store);
-  const ps = kind === 'attack' ? attackBurst() : launchBurst();
+  if (kind === 'normal') {
+    // two ordinary repeat customers in the last few minutes
+    const r = rng(3);
+    const ps = [0, 1].map((i) => mk(`pay_ok_${Date.now()}_${i}`, Date.now() - (6 - i * 3) * 60_000, { user: `user_${10 + i}`, name: person(r), fp: `fp_user_${10 + i}`, country: 'US', usd: i ? 99 : 49 }));
+    let v: Verdict | null = null;
+    for (const p of ps) v = await ingest(store, p);
+    return v;
+  }
+  if (upto === undefined) {
+    const ps = kind === 'attack' ? attackBurst() : launchBurst();
+    let v: Verdict | null = null;
+    for (const p of ps) v = await ingest(store, p);
+    return v;
+  }
+  if (!pending.length || cursor > upto) { pending = kind === 'attack' ? attackBurst() : launchBurst(); cursor = 0; }
   let v: Verdict | null = null;
-  for (const p of ps) v = await ingest(store, p);
-  return v;
+  for (; cursor < Math.min(upto, pending.length); cursor++) v = await ingest(store, pending[cursor]!);
+  return v ?? (await import('./engine.ts')).evaluate(store);
 }
+export function resetBurst() { pending = []; cursor = 0; }
 
 // `node src/simulate.ts` : print what the detector says about each scenario, no server needed.
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!)) {

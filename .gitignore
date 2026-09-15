@@ -3,3 +3,5 @@ node_modules
 *.db
 *.db-*
 .DS_Store
+film/out
+film/frames
