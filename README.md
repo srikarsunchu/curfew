@@ -1,6 +1,6 @@
-# tripwire
+# Nightlatch
 
-Merchant-side fraud tripwire for Whop. It learns what normal looks like for *your* shop, watches every payment as it lands, and contains a card-testing attack before it turns into a hundred chargebacks while you sleep.
+The lock that holds the door while you sleep. A merchant-side fraud layer for Whop. It learns what normal looks like for *your* shop, watches every payment as it lands, and contains a card-testing attack before it turns into a hundred chargebacks while you sleep.
 
 Sentry for payment fraud. Zero dependencies. One process.
 

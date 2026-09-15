@@ -1,9 +1,9 @@
 {
-  "name": "tripwire",
+  "name": "nightlatch",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Merchant-side fraud tripwire for Whop. Learns your normal, watches the webhook stream, contains an attack before it becomes chargebacks.",
+  "description": "Merchant-side fraud nightlatch for Whop. Learns your normal, watches the webhook stream, contains an attack before it becomes chargebacks.",
   "engines": { "node": ">=22.18.0" },
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/server.ts",

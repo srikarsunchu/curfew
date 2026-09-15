@@ -9,7 +9,7 @@ export const config = {
   immediateRevoke: env.IMMEDIATE_REVOKE === '1',
   windowMin: Number(env.WINDOW_MIN ?? 10),
   port: Number(env.PORT ?? 8787),
-  dbPath: env.DB_PATH ?? './tripwire.db',
+  dbPath: env.DB_PATH ?? './nightlatch.db',
   /** Set by the simulator / tests so no real Whop calls are made. */
   dryRun: env.DRY_RUN === '1',
 };
