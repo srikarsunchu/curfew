@@ -70,4 +70,4 @@ const server = createServer(async (req, res) => {
 });
 
 setInterval(() => tick(store).catch(console.error), 15_000);
-server.listen(config.port, () => console.log(`nightlatch on http://localhost:${config.port}${config.dryRun ? ' (DRY_RUN, no Whop calls)' : ''}`));
+server.listen(config.port, () => console.log(`curfew on http://localhost:${config.port}${config.dryRun ? ' (DRY_RUN, no Whop calls)' : ''}`));
