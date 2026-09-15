@@ -1,0 +1,168 @@
+<!doctype html><html lang="en" class="dark-theme"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Curfew</title>
+<meta name="description" content="A merchant-side fraud layer for Whop that acts while you sleep.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Frosted UI dark tokens, as used by Whop Desktop. Values extracted from frosted-ui/styles.css. */
+:root{
+  --gray-1:#111111;--gray-2:#191919;--gray-3:#222222;--gray-4:#2a2a2a;--gray-5:#313131;--gray-6:#3a3a3a;--gray-7:#484848;--gray-8:#606060;--gray-9:#6e6e6e;--gray-10:#7b7b7b;--gray-11:#b4b4b4;--gray-12:#eeeeee;
+  --gray-a2:#ffffff09;--gray-a3:#ffffff12;--gray-a4:#ffffff1b;--gray-a5:#ffffff22;--gray-a6:#ffffff2c;--gray-a8:#ffffff55;
+  --accent-9:#1754d8;--accent-10:#406cc8;--accent-11:#88b5ff;--accent-a3:#1161fd40;--accent-a4:#1a65fd5c;--accent-a6:#3576ff82;
+  --success-9:#30a46c;--success-11:#3dd68c;--success-a3:#22ff991e;--success-a4:#11ff992d;
+  --danger-9:#fd1d1d;--danger-11:#ff9081;--danger-a3:#fc070032;--danger-a4:#ff00004b;--danger-a6:#fe211671;
+  --warning-9:#ffc53d;--warning-11:#ffca16;--warning-a3:#fa820022;--warning-a4:#fc820032;--warning-a6:#fd9b0051;
+  --color-background:var(--gray-1);--color-panel-solid:var(--gray-2);--color-stroke:var(--gray-a4);
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:40px;
+  --radius-3:6px;--radius-4:8px;--radius-5:12px;--radius-6:16px;
+  --font-size-0:10px;--font-size-1:12px;--font-size-2:14px;--font-size-6:24px;
+  --line-height-1:16px;--line-height-2:20px;--line-height-3:24px;
+  --ls-1:0.005em;--ls-2:-0.005em;
+  --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",system-ui,sans-serif;
+  --mono:"Geist Mono","Menlo","Consolas",monospace;
+  --ease:cubic-bezier(.4,0,.2,1);
+  --shadow-2:0 0 0 1px var(--gray-a3),0 1px 1px 0 var(--gray-a4),0 1px 3px 0 #0000001a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--color-background);color:var(--gray-12);font:400 var(--font-size-2)/var(--line-height-2) var(--font);letter-spacing:var(--ls-2);-webkit-font-smoothing:antialiased}
+button{font:inherit;letter-spacing:inherit;color:inherit;cursor:default}
+.content{max-width:1120px;margin:0 auto;padding:0 var(--space-6) var(--space-7)}
+.page{animation:page-in 200ms var(--ease) both}
+@keyframes page-in{from{opacity:0}to{opacity:1}}
+
+/* page header, as Whop Desktop */
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-4);padding:var(--space-7) 0 var(--space-5)}
+.h6{font-size:var(--font-size-6);line-height:var(--line-height-3);font-weight:500;letter-spacing:-0.01em;margin:0}
+.sub{display:block;margin-top:var(--space-1);color:var(--gray-11);font-size:var(--font-size-2)}
+.actions{display:flex;align-items:center;gap:var(--space-2)}
+
+/* Frosted buttons */
+.btn{display:inline-flex;align-items:center;gap:var(--space-2);height:32px;padding:0 var(--space-3);border-radius:var(--radius-4);border:0;font-size:var(--font-size-2);font-weight:500;transition:background-color 150ms var(--ease),color 150ms var(--ease),transform 100ms var(--ease)}
+.btn:active{transform:scale(.98)}
+.btn.s1{height:24px;padding:0 var(--space-2);font-size:var(--font-size-1);border-radius:var(--radius-3)}
+.btn.classic{background:var(--accent-9);color:#fff;box-shadow:inset 0 1px 0 #ffffff1f,0 1px 1px #0000004d}
+.btn.classic:hover{background:var(--accent-10)}
+.btn.surface{background:var(--gray-a2);color:var(--gray-12);box-shadow:inset 0 0 0 1px var(--gray-a5)}
+.btn.surface:hover{background:var(--gray-a3)}
+.btn.soft{background:var(--gray-a3);color:var(--gray-12)}
+.btn.soft:hover{background:var(--gray-a4)}
+.btn.danger{background:var(--danger-a3);color:var(--danger-11)}
+.btn.danger:hover{background:var(--danger-a4)}
+.btn svg{width:15px;height:15px;flex:none}
+.btn.surface svg,.btn.soft svg{color:var(--gray-10)}
+
+/* Frosted card, size 3 */
+.card{background:var(--color-panel-solid);border-radius:var(--radius-6);padding:var(--space-5);box-shadow:var(--shadow-2)}
+.card.s2{padding:var(--space-4)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-3)}
+.h3{font-size:var(--font-size-2);line-height:var(--line-height-2);font-weight:500;margin:0}
+.stack{display:flex;flex-direction:column;gap:var(--space-3)}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-3)}
+.grid-2{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:var(--space-3)}
+@media(max-width:1000px){.grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-2{grid-template-columns:minmax(0,1fr)}}
+
+/* stat tile: label · value · badge + note */
+.stat{display:flex;flex-direction:column;gap:var(--space-2)}
+.t1{font-size:var(--font-size-1);line-height:var(--line-height-1);letter-spacing:var(--ls-1);color:var(--gray-11)}
+.t0{font-size:var(--font-size-0);line-height:var(--line-height-1);letter-spacing:.01em;color:var(--gray-9)}
+.stat-value{font-size:var(--font-size-6);line-height:var(--line-height-3);font-weight:500;letter-spacing:-0.01em;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:var(--space-2)}
+.stat-row{display:flex;align-items:baseline;gap:var(--space-2);min-height:var(--line-height-1)}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:var(--font-size-1);letter-spacing:0;font-variant-numeric:tabular-nums}
+
+/* badges, soft variant */
+.badge{display:inline-flex;align-items:center;gap:var(--space-1);height:18px;padding:0 6px;border-radius:var(--radius-2,4px);font-size:var(--font-size-1);line-height:var(--line-height-1);font-weight:500;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap}
+.badge.gray{background:var(--gray-a3);color:var(--gray-11)}
+.badge.green{background:var(--success-a3);color:var(--success-11)}
+.badge.amber{background:var(--warning-a3);color:var(--warning-11)}
+.badge.red{background:var(--danger-a3);color:var(--danger-11)}
+.badge.blue{background:var(--accent-a3);color:var(--accent-11)}
+
+/* live dot as in the Whop Desktop sidebar */
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--success-9);box-shadow:0 0 0 3px var(--success-a3);flex:none}
+.dot[data-level=elevated]{background:var(--warning-9);box-shadow:0 0 0 3px var(--warning-a3)}
+.dot[data-level=attack]{background:var(--danger-9);box-shadow:0 0 0 3px var(--danger-a3)}
+.dot[data-level=unlearned]{background:var(--gray-8);box-shadow:none}
+
+/* chart, Frosted style */
+.chart{position:relative;width:100%;height:200px;margin-top:var(--space-2)}
+.chart svg{display:block;width:100%;height:100%;overflow:visible}
+.chart-grid{stroke:var(--gray-a4);stroke-width:1}
+.chart-axis{fill:var(--gray-9);font-size:var(--font-size-0);font-family:var(--font)}
+.bar-paid{fill:var(--accent-9)}.bar-fail{fill:var(--danger-9);opacity:.85}
+.bar{transform-origin:bottom;animation:bar-in 300ms var(--ease) both}
+@keyframes bar-in{from{transform:scaleY(0)}}
+.chart-mark{stroke:var(--danger-9);stroke-width:1;stroke-dasharray:2 3}
+.legend{display:flex;gap:var(--space-4);margin-top:var(--space-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+
+/* signal ledger: the anchor. label col | now | usual | verdict */
+.ledger{display:grid;grid-template-columns:16px 104px minmax(0,1fr) auto;column-gap:var(--space-3);row-gap:0}
+.ledger>div{padding:10px 0;border-top:1px solid var(--color-stroke);display:flex;align-items:center;min-height:40px}
+.ledger>div:nth-child(-n+4){border-top:0;padding-top:0}
+.ledger .name{font-weight:500}
+.ledger .note{color:var(--gray-11);font-size:var(--font-size-1);line-height:var(--line-height-1)}
+.ledger .ind{width:8px;height:8px;border-radius:999px;background:var(--gray-6)}
+.ledger .ind[data-on]{background:var(--danger-9);box-shadow:0 0 0 3px var(--danger-a3)}
+
+/* tables, Frosted */
+.table-clip{overflow:auto;margin:0 calc(var(--space-5) * -1) calc(var(--space-5) * -1)}
+table{width:100%;border-collapse:collapse;font-size:var(--font-size-2)}
+th{text-align:left;font-weight:400;color:var(--gray-11);font-size:var(--font-size-1);line-height:var(--line-height-1);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--color-stroke);white-space:nowrap}
+td{padding:0 var(--space-3);height:40px;border-bottom:1px solid var(--color-stroke);white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th:first-child,td:first-child{padding-left:var(--space-5)}th:last-child,td:last-child{padding-right:var(--space-5)}
+tr[data-clickable]{transition:background-color 150ms var(--ease)}tr[data-clickable]:hover td{background:var(--gray-a2)}
+tr[data-selected] td{background:var(--gray-a3)}
+td.right,th.right{text-align:right}
+.cell-user{display:flex;align-items:center;gap:var(--space-2);min-width:0}
+.avatar{width:24px;height:24px;border-radius:var(--radius-3);background:var(--gray-4);color:var(--gray-11);font-size:var(--font-size-0);font-weight:500;display:inline-flex;align-items:center;justify-content:center;flex:none;letter-spacing:0}
+.cell-user-text{display:flex;flex-direction:column;min-width:0;line-height:var(--line-height-1)}
+.cell-user-text small{color:var(--gray-9);font-size:var(--font-size-0);font-family:var(--mono)}
+.insights{padding:var(--space-2) var(--space-5) var(--space-3) 60px !important;height:auto !important;white-space:normal !important;background:var(--gray-a2)}
+.insights ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px;font-size:var(--font-size-1);line-height:var(--line-height-1);color:var(--gray-11)}
+.insights li::before{content:"";display:inline-block;width:4px;height:4px;border-radius:999px;background:var(--gray-8);margin:0 8px 2px 0}
+.insights li[data-bad]::before{background:var(--danger-9)}
+.empty{padding:var(--space-6) var(--space-5);text-align:center;color:var(--gray-9);font-size:var(--font-size-1)}
+.kv{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--space-3)}
+.kv b{display:block;font-weight:500;font-variant-numeric:tabular-nums}
+.demo{display:inline-flex;align-items:center;gap:var(--space-1);padding:2px 2px 2px var(--space-2);border-radius:var(--radius-4);background:var(--gray-a2);box-shadow:inset 0 0 0 1px var(--gray-a4)}
+.demo .t0{margin-right:var(--space-1)}
+@media(prefers-reduced-motion:reduce){.page,.bar{animation:none}}
+</style>
+<style>
+.hero{padding:var(--space-7) 0 var(--space-6);max-width:720px}
+.h1{font-size:40px;line-height:1.1;font-weight:500;letter-spacing:-0.02em;margin:0 0 var(--space-4)}
+.lead{font-size:var(--font-size-2);line-height:var(--line-height-3);color:var(--gray-11);margin:0 0 var(--space-5);max-width:560px}
+.video{border-radius:var(--radius-6);overflow:hidden;box-shadow:var(--shadow-2);background:#000;margin:var(--space-5) 0}
+.video video{display:block;width:100%}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3)}@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.step b{display:block;font-weight:500;margin-bottom:var(--space-1)}.step p{margin:0;color:var(--gray-11);font-size:var(--font-size-1);line-height:var(--line-height-1)}
+.limits li{margin:0 0 var(--space-2)}
+a{color:var(--accent-11);text-decoration:none}a:hover{text-decoration:underline}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:var(--space-5) 0 0}
+.wordmark{font-weight:500;letter-spacing:-0.01em}
+.foot{margin-top:var(--space-7);color:var(--gray-9);font-size:var(--font-size-1)}
+</style></head><body><div class="content page">
+<div class="nav"><span class="wordmark">Curfew</span><div class="actions"><a class="btn surface" href="https://github.com/srikarsunchu/curfew" style="text-decoration:none">GitHub</a><a class="btn classic" href="/connect" style="text-decoration:none">Connect your Whop</a></div></div>
+<div class="hero">
+  <h1 class="h1">A fraud layer for Whop that acts while you sleep.</h1>
+  <p class="lead">Curfew learns what normal looks like for your shop, watches every payment as it lands, and contains a card-testing attack before it turns into a hundred chargebacks. It refunds and revokes the batch in ten minutes, not when you wake up.</p>
+  <div class="actions"><a class="btn classic" href="/connect" style="text-decoration:none">Connect your Whop</a><span class="t1">Two minutes. One API key. Free.</span></div>
+</div>
+<div class="video"><video src="/demo.mp4" autoplay muted loop playsinline></video></div>
+<div class="cols">
+  <div class="card s2 step"><b>1. It learns your normal</b><p>Sixty days of your payments: rate per hour, first-time-buyer share, decline rate, average order, the countries you actually sell to.</p></div>
+  <div class="card s2 step"><b>2. It scores every payment</b><p>Six signals over a ten-minute window, each explained in plain numbers. A real launch fires two. Card testing fires five.</p></div>
+  <div class="card s2 step"><b>3. It acts, then asks</b><p>Three or more signals: alert, hold, then refund and revoke unless you press undo. Launch mode for drop days.</p></div>
+</div>
+<div class="card" style="margin-top:var(--space-3)"><h3 class="h3" style="margin-bottom:var(--space-2)">What it cannot do</h3>
+<ul class="limits t1" style="color:var(--gray-11);margin:0;padding-left:18px">
+<li>It cannot decline a charge. Whop is the merchant of record. Curfew shrinks the damage window; it does not close it.</li>
+<li>Refunds still cost the processing fee. You trade a small certain loss for avoiding disputes, which is what actually gets accounts suspended.</li>
+<li>Your API key and webhook secret are encrypted at rest. Curfew can read your payments, refund them, and cancel memberships. Grant only the scopes listed on the connect page. Disconnect deletes everything.</li>
+</ul></div>
+<p class="foot">Open source, MIT. <a href="https://github.com/srikarsunchu/curfew">Read the code</a> or self-host it.</p>
+</div></body></html>

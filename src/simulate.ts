@@ -1,6 +1,6 @@
 import { learnBaseline } from './baseline.ts';
 import { ingest } from './engine.ts';
-import { Store } from './store.ts';
+import type { Ctx } from './tenant.ts';
 import type { Payment, Verdict } from './types.ts';
 
 /** Deterministic PRNG so demos replay the same way. */
@@ -75,36 +75,36 @@ export function launchBurst(now = Date.now(), seed = 9): Payment[] {
   return out;
 }
 
-/** Seed a store with synthetic history and a learned baseline. */
-export function seed(store: Store, windowMin = 10) {
-  for (const p of history()) store.upsertPayment(p);
-  store.baseline = learnBaseline(store.allPayments(), windowMin, 60);
+/** Seed a shop with synthetic history and a learned baseline. */
+export async function seed(ctx: Ctx) {
+  for (const p of history()) await ctx.shop.upsertPayment(p);
+  await ctx.shop.setBaseline(learnBaseline(await ctx.shop.allPayments(), ctx.settings.windowMin, 60));
 }
 
 let pending: Payment[] = [];
 let cursor = 0;
 
 /** Ingest a whole burst, or with `upto` only the first N payments of a burst prepared once (for stepped demos). */
-export async function burst(store: Store, kind: 'attack' | 'launch' | 'normal', upto?: number): Promise<Verdict | null> {
-  if (!store.baseline) seed(store);
+export async function burst(ctx: Ctx, kind: 'attack' | 'launch' | 'normal', upto?: number): Promise<Verdict | null> {
+  if (!(await ctx.shop.getBaseline())) await seed(ctx);
   if (kind === 'normal') {
     // two ordinary repeat customers in the last few minutes
     const r = rng(3);
     const ps = [0, 1].map((i) => mk(`pay_ok_${Date.now()}_${i}`, Date.now() - (6 - i * 3) * 60_000, { user: `user_${10 + i}`, name: person(r), fp: `fp_user_${10 + i}`, country: 'US', usd: i ? 99 : 49 }));
     let v: Verdict | null = null;
-    for (const p of ps) v = await ingest(store, p);
+    for (const p of ps) v = await ingest(ctx, p);
     return v;
   }
   if (upto === undefined) {
     const ps = kind === 'attack' ? attackBurst() : launchBurst();
     let v: Verdict | null = null;
-    for (const p of ps) v = await ingest(store, p);
+    for (const p of ps) v = await ingest(ctx, p);
     return v;
   }
   if (!pending.length || cursor > upto) { pending = kind === 'attack' ? attackBurst() : launchBurst(); cursor = 0; }
   let v: Verdict | null = null;
-  for (; cursor < Math.min(upto, pending.length); cursor++) v = await ingest(store, pending[cursor]!);
-  return v ?? (await import('./engine.ts')).evaluate(store);
+  for (; cursor < Math.min(upto, pending.length); cursor++) v = await ingest(ctx, pending[cursor]!);
+  return v ?? (await import('./engine.ts')).evaluate(ctx);
 }
 export function resetBurst() { pending = []; cursor = 0; }
 
@@ -112,12 +112,13 @@ export function resetBurst() { pending = []; cursor = 0; }
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!)) {
   process.env.DRY_RUN = '1';
   const { detect } = await import('./detector.ts');
+  const { demoCtx } = await import('./demo.ts');
   for (const kind of ['attack', 'launch'] as const) {
-    const store = new Store(':memory:');
-    seed(store);
+    const ctx = await demoCtx(':memory:');
+    await seed(ctx);
     const ps = kind === 'attack' ? attackBurst() : launchBurst();
-    for (const p of ps) store.upsertPayment(p);
-    const v = detect({ baseline: store.baseline!, window: ps, firstSeen: store.firstSeen() });
+    for (const p of ps) await ctx.shop.upsertPayment(p);
+    const v = detect({ baseline: (await ctx.shop.getBaseline())!, window: ps, firstSeen: await ctx.shop.firstSeen() });
     console.log(`\n${kind.toUpperCase()} -> ${v.level} (${v.score}/6), ${v.suspects.length} suspects`);
     for (const s of v.signals) console.log(`  ${s.fired ? '🔴' : '⚪'} ${s.name.padEnd(12)} ${s.note}`);
   }

@@ -1,0 +1,5 @@
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
+  "functions": { "api/index.ts": { "includeFiles": "views/**", "maxDuration": 60 } },
+  "crons": [{ "path": "/api/tick", "schedule": "* * * * *" }]
+}

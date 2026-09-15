@@ -129,13 +129,16 @@ td.right,th.right{text-align:right}
 .kv b{display:block;font-weight:500;font-variant-numeric:tabular-nums}
 .demo{display:inline-flex;align-items:center;gap:var(--space-1);padding:2px 2px 2px var(--space-2);border-radius:var(--radius-4);background:var(--gray-a2);box-shadow:inset 0 0 0 1px var(--gray-a4)}
 .demo .t0{margin-right:var(--space-1)}
+.inp{height:32px;border-radius:var(--radius-4);border:0;background:var(--gray-a2);box-shadow:inset 0 0 0 1px var(--gray-a5);color:var(--gray-12);padding:0 var(--space-3);font:inherit;letter-spacing:inherit}.inp:focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent-9)}
+.banner{border-radius:var(--radius-5);padding:var(--space-3) var(--space-4);background:var(--accent-a3);color:var(--accent-11);font-size:var(--font-size-1);display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)}.banner.warn{background:var(--warning-a3);color:var(--warning-11)}.banner.bad{background:var(--danger-a3);color:var(--danger-11)}
 @media(prefers-reduced-motion:reduce){.page,.bar{animation:none}}
 </style></head><body><div class="content page">
 <div class="page-header">
-  <div><h1 class="h6">Curfew</h1><span class="sub" id="sub">Connecting…</span></div>
+  <div><h1 class="h6" id="title">Curfew</h1><span class="sub" id="sub">Connecting…</span></div>
   <div class="actions" id="actions"></div>
 </div>
 <div class="stack">
+  <div id="banner" hidden></div>
   <div class="grid-4" id="tiles"></div>
   <div class="grid-2">
     <div class="card"><div class="panel-head"><h3 class="h3">Activity</h3><span class="t1" id="chart-meta">last 60 minutes</span></div><div class="chart" id="chart"></div>
@@ -145,6 +148,14 @@ td.right,th.right{text-align:right}
   <div class="card"><div class="panel-head"><h3 class="h3">Payments</h3><span class="t1" id="pay-meta"></span></div><div class="table-clip" id="payments"></div></div>
   <div class="card"><div class="panel-head"><h3 class="h3">Incidents</h3><span class="t1" id="inc-meta"></span></div><div class="table-clip" id="incidents"></div></div>
   <div class="card s2"><div class="panel-head" style="margin-bottom:var(--space-2)"><h3 class="h3">What normal looks like</h3><span class="t1" id="base-meta"></span></div><div class="kv t1" id="baseline"></div></div>
+  <div class="card s2" id="settings"><div class="panel-head" style="margin-bottom:var(--space-2)"><h3 class="h3">Settings</h3><span class="t1" id="set-meta"></span></div>
+    <div class="row" style="gap:var(--space-4);align-items:flex-end;flex-wrap:wrap">
+      <div><label class="t1" style="display:block;margin-bottom:4px">Alert webhook</label><input id="s-alert" class="inp" placeholder="https://hooks.slack.com/…" style="width:340px"></div>
+      <div><label class="t1" style="display:block;margin-bottom:4px">Hold before refund (min)</label><input id="s-delay" class="inp" type="number" min="1" max="120" style="width:100px"></div>
+      <label class="t1" style="display:flex;align-items:center;gap:6px;height:32px"><input type="checkbox" id="s-revoke"> revoke access immediately on attack</label>
+      <button class="btn surface" id="s-save">Save</button>
+      <span style="margin-left:auto" class="row"><button class="btn soft s1" id="s-relearn">Re-learn baseline</button><button class="btn soft s1" id="s-disc" style="color:var(--danger-11)">Disconnect</button><a class="btn soft s1" href="/logout" style="text-decoration:none">Sign out</a></span>
+    </div></div>
 </div></div>
 <script>
 const I={
@@ -227,7 +238,21 @@ function baseline(s){
  $('#baseline').innerHTML=kv('Paid per day',perDay.toFixed(0))+kv('Average order',usd(b.avg_usd))+kv('First-time buyers',pct(b.new_buyer_share))+kv('Decline rate',pct(b.decline_share))+kv('Sells to',top)+kv('Window',`${s.config.windowMin} min`);
 }
 function header(s){
- const lv=s.last?.level;$('#sub').textContent=[s.config.dryRun?'Northwind Picks (demo)':'Connected to Whop',s.baseline?`${s.baseline.total_paid.toLocaleString()} payments learned`:'baseline not learned',`refunds hold ${s.config.refundDelayMin} min`].join(' · ');
+ $('#title').textContent=s.tenant?.title||'Curfew';
+ $('#sub').textContent=[s.config.dryRun?'Demo data':(s.tenant?.webhook?'Webhook connected':'Webhook not registered'),s.baseline?`${s.baseline.total_paid.toLocaleString()} payments learned`:'baseline not learned',`refunds hold ${s.config.refundDelayMin} min`].join(' · ');
+ const L=s.learn,b=$('#banner');
+ if(L&&L.state==='running'){b.hidden=false;b.className='banner';b.innerHTML=`<span>Learning your baseline… ${L.fetched} payments so far. This page refreshes on its own.</span>`;}
+ else if(L&&L.state==='error'){b.hidden=false;b.className='banner bad';b.innerHTML=`<span>Learning failed: ${esc(L.error)}</span><button class="btn soft s1" onclick="post('/api/relearn').then(load)">Retry</button>`;}
+ else if(L&&L.webhook==='error'){b.hidden=false;b.className='banner warn';b.innerHTML=`<span>Baseline learned, but the webhook could not be registered: ${esc(L.webhook_error)}. Add the developer:manage_webhook scope and retry.</span><button class="btn soft s1" onclick="post('/api/relearn').then(load)">Retry</button>`;}
+ else if(!s.config.dryRun&&s.baseline&&!s.last){b.hidden=false;b.className='banner';b.innerHTML=`<span>Connected. Curfew is watching. Nothing has come in since the webhook was registered.</span>`;}
+ else b.hidden=true;
+ if(document.activeElement?.id!=='s-alert'){$('#s-alert').value=s.config.alertUrl||'';}
+ if(document.activeElement?.id!=='s-delay'){$('#s-delay').value=s.config.refundDelayMin;}
+ $('#s-revoke').checked=!!s.config.immediateRevoke;
+ $('#s-save').onclick=()=>post('/api/settings',{alertUrl:$('#s-alert').value,refundDelayMin:Number($('#s-delay').value),immediateRevoke:$('#s-revoke').checked}).then(()=>{$('#set-meta').textContent='saved';load();});
+ $('#s-relearn').onclick=()=>{$('#set-meta').textContent='re-learning…';post('/api/relearn').then(load);};
+ $('#s-disc').onclick=()=>{if(confirm('Disconnect Curfew from this shop? The webhook is removed and all stored payments are deleted.'))post('/api/disconnect').then(()=>location.href='/');};
+ $('#settings').hidden=!!s.config.dryRun;
  const launch=s.launch_until?`<button class="btn surface" onclick="post('/api/launch',{hours:0}).then(load)">${I.rocket}End launch mode · until ${time(s.launch_until)}</button>`:`<button class="btn surface" onclick="post('/api/launch',{hours:2}).then(load)">${I.rocket}I'm launching</button>`;
  const demo=s.config.dryRun?`<span class="demo"><span class="t0">DEMO</span><button class="btn soft s1" onclick="post('/api/simulate',{kind:'attack'}).then(load)">${I.bolt}Card-testing attack</button><button class="btn soft s1" onclick="post('/api/simulate',{kind:'launch'}).then(load)">${I.play}Real launch</button><button class="btn soft s1" onclick="post('/api/simulate',{kind:'reset'}).then(()=>{selected=null;load()})">${I.reset}Reset</button></span>`:'';
  $('#actions').innerHTML=demo+launch;
